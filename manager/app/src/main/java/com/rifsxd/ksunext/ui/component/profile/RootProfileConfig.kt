@@ -209,7 +209,7 @@ fun GroupsPanel(selected: List<Groups>, closeSelection: (selection: Set<Groups>)
         )
     }
 
-    OutlinedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
@@ -280,7 +280,7 @@ fun CapsPanel(
         )
     }
 
-    OutlinedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
