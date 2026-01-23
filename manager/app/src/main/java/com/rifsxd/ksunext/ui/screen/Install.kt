@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -44,10 +46,17 @@ import com.rifsxd.ksunext.*
 import com.rifsxd.ksunext.R
 import com.rifsxd.ksunext.ui.component.DialogHandle
 import com.rifsxd.ksunext.ui.component.SelectionDialog
+import com.rifsxd.ksunext.ui.component.ConfirmResult
 import com.rifsxd.ksunext.ui.component.rememberConfirmDialog
+import com.rifsxd.ksunext.ui.component.BlurDialog
 import com.rifsxd.ksunext.ui.component.rememberCustomDialog
 import com.rifsxd.ksunext.ui.util.*
-import java.util.Locale
+import kotlinx.coroutines.launch
+import android.widget.Toast
+import android.os.Environment
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * @author weishu
@@ -61,6 +70,8 @@ fun InstallScreen(navigator: DestinationsNavigator) {
     var installMethod by remember {
         mutableStateOf<InstallMethod?>(null)
     }
+
+    val scope = rememberCoroutineScope()
 
     var lkmSelection by remember {
         mutableStateOf<LkmSelection>(LkmSelection.KmiNone)
@@ -130,6 +141,39 @@ fun InstallScreen(navigator: DestinationsNavigator) {
             }
         }
 
+    val repackLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        // Copy to cache
+                        val cacheFile = File(ksuApp.cacheDir, "repack_source")
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            cacheFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+
+                        val outDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath
+                        val cmd = "magiskboot repack --source \"${cacheFile.absolutePath}\" --out \"$outDir\""
+                        val success = execKsud(cmd)
+
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, if (success) context.getString(R.string.magiskboot_repack_success) else context.getString(R.string.magiskboot_repack_failed), Toast.LENGTH_SHORT).show()
+                        }
+                        cacheFile.delete()
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     val onLkmUpload = {
         selectLkmLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply {
             type = "application/octet-stream"
@@ -145,7 +189,6 @@ fun InstallScreen(navigator: DestinationsNavigator) {
         topBar = {
             TopBar(
                 onBack = dropUnlessResumed { navigator.popBackStack() },
-                onLkmUpload = if (kernelVersion.isGKI()) onLkmUpload else null,
                 scrollBehavior = scrollBehavior
             )
         },
@@ -157,45 +200,369 @@ fun InstallScreen(navigator: DestinationsNavigator) {
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .verticalScroll(rememberScrollState())
         ) {
-            SelectInstallMethod { method ->
-                installMethod = method
-            }
+            val rootAvailable = rootAvailable()
+            val isAbDevice = produceState(initialValue = false) {
+                value = isAbDevice()
+            }.value
 
-            if (installMethod !is InstallMethod.AnyKernel && installMethod != null) {
-                SelectInstallOptions(
-                    allowShell, { allowShell = it },
-                    enableAdbd, { enableAdbd = it },
-                    noInstall, { noInstall = it }
-                )
-            }
+            var isLkmCategory by remember { mutableStateOf(true) }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
+            val selectFileTip = stringResource(
+                id = R.string.select_file_tip,
+                if (kernelVersion.isKernel510())
+                    "boot"
+                else
+                    "init_boot/vendor_boot"
+            )
+
+            // LKM Card
+            InstallCategoryCard(
+                title = stringResource(R.string.install_category_lkm),
+                selected = isLkmCategory,
+                infoTitle = stringResource(R.string.lkm_mode_title),
+                infoDesc = stringResource(R.string.lkm_mode_desc),
+                onSelect = { isLkmCategory = true; installMethod = null }
             ) {
-                (lkmSelection as? LkmSelection.LkmUri)?.let {
-                    Text(
-                        stringResource(
-                            id = R.string.selected_lkm,
-                            it.uri.lastPathSegment ?: "(file)"
-                        )
-                    )
+                // LKM Methods
+                val lkmMethods = mutableListOf<InstallMethod>()
+                lkmMethods.add(InstallMethod.SelectFile(summary = selectFileTip))
+                if (rootAvailable) {
+                    if (kernelVersion.isGKI()) {
+                        lkmMethods.add(InstallMethod.DirectInstall)
+                        if (isAbDevice) {
+                            lkmMethods.add(InstallMethod.DirectInstallToInactiveSlot)
+                        }
+                    }
                 }
-                Button(modifier = Modifier.fillMaxWidth(),
-                    enabled = installMethod != null,
-                    onClick = {
-                        onClickNext()
-                    }) {
-                    Text(
-                        stringResource(id = R.string.install_next),
-                        fontSize = MaterialTheme.typography.bodyMedium.fontSize
+
+                val selectImageLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartActivityForResult()
+                ) {
+                    if (it.resultCode == Activity.RESULT_OK) {
+                        it.data?.data?.let { uri ->
+                            installMethod = InstallMethod.SelectFile(uri, summary = selectFileTip)
+                        }
+                    }
+                }
+
+                val confirmDialog = rememberConfirmDialog()
+                val dialogTitle = stringResource(id = android.R.string.dialog_alert_title)
+                val dialogContent = stringResource(id = R.string.install_inactive_slot_warning)
+
+
+                Column(modifier = Modifier.padding(16.dp)) {
+                    lkmMethods.forEach { method ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = (installMethod?.javaClass == method.javaClass),
+                                    onClick = {
+                                        when (method) {
+                                            is InstallMethod.SelectFile -> installMethod = method // Just select, don't launch yet
+                                            is InstallMethod.DirectInstall -> installMethod = method
+                                            is InstallMethod.DirectInstallToInactiveSlot -> installMethod = method // Warning on install click? Or here?
+                                            else -> {}
+                                        }
+                                    },
+                                    role = Role.RadioButton
+                                )
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = (installMethod?.javaClass == method.javaClass),
+                                onClick = null
+                            )
+                            Column(modifier = Modifier.padding(start = 16.dp)) {
+                                Text(
+                                    text = stringResource(id = method.label),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                if (method.summary != null) {
+                                    Text(
+                                        text = method.summary!!,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                if (method is InstallMethod.SelectFile && installMethod is InstallMethod.SelectFile) {
+                                     (installMethod as InstallMethod.SelectFile).uri?.let { uri ->
+                                         Text(
+                                            text = uri.lastPathSegment ?: "(file)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                         )
+                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    // Custom LKM Picker (Moved from TopBar)
+                    if (kernelVersion.isGKI()) {
+                         Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { onLkmUpload() }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                             Icon(Icons.Filled.FileUpload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                             Column(modifier = Modifier.padding(start = 16.dp)) {
+                                 Text(
+                                     text = stringResource(R.string.install_select_custom_lkm),
+                                     style = MaterialTheme.typography.bodyLarge
+                                 )
+                                 (lkmSelection as? LkmSelection.LkmUri)?.let {
+                                     Text(
+                                        text = it.uri.lastPathSegment ?: "(file)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                     )
+                                 }
+                             }
+                        }
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    }
+
+                    // Install Options
+                    SelectInstallOptions(
+                        allowShell, { allowShell = it },
+                        enableAdbd, { enableAdbd = it },
+                        noInstall, { noInstall = it }
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = installMethod != null && installMethod !is InstallMethod.AnyKernel,
+                        onClick = {
+                            if (installMethod is InstallMethod.SelectFile && (installMethod as InstallMethod.SelectFile).uri == null) {
+                                selectImageLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply {
+                                    type = "application/octet-stream"
+                                })
+                            } else if (installMethod is InstallMethod.DirectInstallToInactiveSlot) {
+                                scope.launch {
+                                    val result = confirmDialog.awaitConfirm(dialogTitle, dialogContent)
+                                    if (result == ConfirmResult.Confirmed) {
+                                        onClickNext()
+                                    }
+                                }
+                            } else {
+                                onClickNext()
+                            }
+                        }
+                    ) {
+                        Text(stringResource(R.string.install_continue))
+                    }
+                }
+            }
+
+            // GKI / AnyKernel Card
+            InstallCategoryCard(
+                title = stringResource(R.string.install_category_gki),
+                selected = !isLkmCategory,
+                infoTitle = stringResource(R.string.gki_mode_title),
+                infoDesc = stringResource(R.string.gki_mode_desc),
+                onSelect = {
+                    if (rootAvailable) {
+                        isLkmCategory = false
+                        installMethod = InstallMethod.AnyKernel() // Default to AnyKernel
+                    }
+                }
+            ) {
+                if (!rootAvailable) {
+                    Text(
+                        text = "Root required for AnyKernel flashing",
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    val selectAnyKernelLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.StartActivityForResult()
+                    ) {
+                        if (it.resultCode == Activity.RESULT_OK) {
+                            it.data?.data?.let { uri ->
+                                installMethod = InstallMethod.AnyKernel(uri)
+                            }
+                        }
+                    }
+
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = true, onClick = null)
+                            Column(modifier = Modifier.padding(start = 16.dp)) {
+                                Text(
+                                    text = stringResource(R.string.anykernel_install),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                if (installMethod is InstallMethod.AnyKernel) {
+                                     (installMethod as InstallMethod.AnyKernel).uri?.let { uri ->
+                                         Text(
+                                            text = uri.lastPathSegment ?: "(file)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                         )
+                                     }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = {
+                                if (installMethod is InstallMethod.AnyKernel && (installMethod as InstallMethod.AnyKernel).uri == null) {
+                                     selectAnyKernelLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply {
+                                        type = "application/zip"
+                                        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"))
+                                        addCategory(Intent.CATEGORY_OPENABLE)
+                                    })
+                                } else {
+                                    onClickNext()
+                                }
+                            }
+                        ) {
+                            Text(stringResource(R.string.install_continue))
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider()
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = stringResource(R.string.magiskboot_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    scope.launch(Dispatchers.IO) {
+                                        val outDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath
+                                        val cmd = "magiskboot unpack --out \"$outDir\""
+                                        val success = execKsud(cmd)
+                                        withContext(Dispatchers.Main) {
+                                            Toast.makeText(context, if (success) context.getString(R.string.magiskboot_unpack_success) else context.getString(R.string.magiskboot_unpack_failed), Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text(stringResource(R.string.magiskboot_unpack))
+                            }
+
+                            Button(
+                                modifier = Modifier.weight(1f),
+                                onClick = {
+                                    repackLauncher.launch(Intent(Intent.ACTION_GET_CONTENT).apply {
+                                        type = "*/*"
+                                        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/octet-stream"))
+                                    })
+                                }
+                            ) {
+                                Text(stringResource(R.string.magiskboot_repack))
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+@Composable
+fun InstallCategoryCard(
+    title: String,
+    selected: Boolean,
+    infoTitle: String? = null,
+    infoDesc: String? = null,
+    onSelect: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    var showInfo by remember { mutableStateOf(false) }
+
+    if (showInfo && infoTitle != null && infoDesc != null) {
+        BlurDialog(
+            onDismissRequest = { showInfo = false }
+        ) {
+            Text(
+                text = infoTitle,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = infoDesc,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = { showInfo = false }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            }
+        }
+    }
+
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clickable { onSelect() },
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(selected = selected, onClick = onSelect)
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier
+                        .padding(start = 16.dp)
+                        .weight(1f),
+                    fontWeight = FontWeight.Bold
+                )
+                if (infoTitle != null && infoDesc != null) {
+                    IconButton(onClick = { showInfo = true }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Info,
+                            contentDescription = stringResource(R.string.issue_report_title) // Using a generic string or "Info"
+                        )
+                    }
+                }
+            }
+            if (selected) {
+                HorizontalDivider()
+                content()
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun SelectInstallOptions(
@@ -445,7 +812,6 @@ private fun SelectInstallMethod(onSelected: (InstallMethod) -> Unit = {}) {
 @Composable
 private fun TopBar(
     onBack: () -> Unit,
-    onLkmUpload: (() -> Unit)? = null,
     scrollBehavior: TopAppBarScrollBehavior? = null
 ) {
     TopAppBar(
@@ -459,16 +825,6 @@ private fun TopBar(
         navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-            }
-        },
-        actions = {
-            if (onLkmUpload != null) {
-                IconButton(onClick = onLkmUpload) {
-                    Icon(
-                        imageVector = Icons.Filled.FileUpload,
-                        contentDescription = stringResource(id = R.string.select_file)
-                    )
-                }
             }
         },
         windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),

@@ -1,4 +1,3 @@
-
 use anyhow::{Context, Result, bail};
 use const_format::concatcp;
 use std::collections::HashMap;
@@ -53,9 +52,7 @@ impl FeatureId {
             Self::EnhancedSecurity => {
                 "Enhanced Security - disable non‑KSU root elevation and unauthorized UID downgrades"
             }
-            Self::AvcSpoof => {
-                "AVC Spoof - fix selinux context leak due to avc denial"
-            }
+            Self::AvcSpoof => "AVC Spoof - fix selinux context leak due to avc denial",
         }
     }
 }

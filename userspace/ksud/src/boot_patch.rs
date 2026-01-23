@@ -377,7 +377,7 @@ fn is_kernelsu_patched(magiskboot: &Path, workdir: &Path, cpio_path: &Path) -> R
     Ok(status.success())
 }
 
-fn find_magiskboot(magiskboot_path: Option<PathBuf>, workdir: &Path) -> Result<PathBuf> {
+pub fn find_magiskboot(magiskboot_path: Option<PathBuf>, workdir: &Path) -> Result<PathBuf> {
     let magiskboot = {
         if which("magiskboot").is_ok() {
             #[cfg(target_os = "android")]
@@ -402,7 +402,7 @@ fn find_magiskboot(magiskboot_path: Option<PathBuf>, workdir: &Path) -> Result<P
     Ok(magiskboot)
 }
 
-fn find_boot_image(
+pub fn find_boot_image(
     image: &Option<PathBuf>,
     kmi: &str,
     ota: bool,

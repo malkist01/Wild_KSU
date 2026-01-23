@@ -272,4 +272,20 @@
     <string name="install_option_enable_adbd_summary">Force enable adbd and disable adbd auth</string>
     <string name="install_option_no_install">No install</string>
     <string name="install_option_no_install_summary">Do not (re-)install kernelsu, only modify configs</string>
+
+    <string name="install_category_lkm">LKM</string>
+    <string name="install_category_gki">GKI</string>
+    <string name="install_select_custom_lkm">Select custom LKM</string>
+    <string name="install_continue">Continue</string>
+    <string name="lkm_mode_title">LKM Mode: Loadable Kernel Module</string>
+    <string name="lkm_mode_desc">Load the Loadable Kernel Module (LKM) into the device kernel without replacing the original kernel.</string>
+    <string name="gki_mode_title">GKI Mode: Generic Kernel Integration</string>
+    <string name="gki_mode_desc">Replace the original kernel of the device with a Kernel Image that has Wild KSU integrated.</string>
+    <string name="magiskboot_title">Magiskboot</string>
+    <string name="magiskboot_unpack">Unpack Kernel</string>
+    <string name="magiskboot_repack">Repack Kernel</string>
+    <string name="magiskboot_unpack_success">Unpack successful (saved to Downloads)</string>
+    <string name="magiskboot_unpack_failed">Unpack failed</string>
+    <string name="magiskboot_repack_success">Repack successful (saved to Downloads)</string>
+    <string name="magiskboot_repack_failed">Repack failed</string>
 </resources>

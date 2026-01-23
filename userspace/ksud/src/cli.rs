@@ -85,6 +85,20 @@ enum Commands {
         #[command(subcommand)]
         command: Kernel,
     },
+
+    /// Magiskboot utilities
+    Magiskboot {
+        #[command(subcommand)]
+        command: MagiskbootCmd,
+    },
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum MagiskbootCmd {
+    /// Unpack boot image
+    Unpack(crate::magiskboot::UnpackArgs),
+    /// Repack boot image
+    Repack(crate::magiskboot::RepackArgs),
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -635,6 +649,10 @@ pub fn run() -> Result<()> {
                 ksucalls::report_module_mounted();
                 Ok(())
             }
+        },
+        Commands::Magiskboot { command } => match command {
+            MagiskbootCmd::Unpack(args) => crate::magiskboot::unpack(args),
+            MagiskbootCmd::Repack(args) => crate::magiskboot::repack(args),
         },
     };
 
