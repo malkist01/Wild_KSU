@@ -1,6 +1,7 @@
 name: ClangFormat check
 
 on:
+  workflow_call:
   push:
     branches:
       - stable

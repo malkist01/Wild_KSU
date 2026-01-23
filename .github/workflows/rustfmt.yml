@@ -1,6 +1,7 @@
 name: Rustfmt check
 
 on:
+  workflow_call:
   push:
     branches:
       - stable

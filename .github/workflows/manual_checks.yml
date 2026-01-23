@@ -1,0 +1,23 @@
+name: Manual Checks
+
+on:
+  workflow_dispatch:
+
+jobs:
+  shellcheck:
+    uses: ./.github/workflows/shellcheck.yml
+
+  rustfmt:
+    uses: ./.github/workflows/rustfmt.yml
+    secrets: inherit
+
+  clang-format:
+    uses: ./.github/workflows/clang-format.yml
+    secrets: inherit
+
+  clippy:
+    uses: ./.github/workflows/clippy.yml
+
+  build-checks:
+    uses: ./.github/workflows/build-manager.yml
+    secrets: inherit
