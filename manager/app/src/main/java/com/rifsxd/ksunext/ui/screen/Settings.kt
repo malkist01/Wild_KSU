@@ -515,7 +515,7 @@ fun SettingScreen(navigator: DestinationsNavigator) {
                 }
             }
             
-            IssueReportCard(
+            AboutCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(12.dp)
