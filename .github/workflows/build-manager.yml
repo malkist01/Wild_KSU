@@ -394,7 +394,7 @@ jobs:
           # Send Changes message first
           if [ -n "$CHANGELOG_SECTION" ]; then
             echo "Sending changes message to DM..."
-            FULL_MESSAGE=$(printf '%s\n\n%s' "$MESSAGE" "$CHANGELOG_SECTION")
+            FULL_MESSAGE=$(printf '%s\n%s' "$MESSAGE" "$CHANGELOG_SECTION")
             curl -sS -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
               -d chat_id="${{ secrets.TELEGRAM_USER_ID }}" \
               -d parse_mode="HTML" \
