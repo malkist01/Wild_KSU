@@ -363,7 +363,9 @@ bool is_manager_apk(char *path)
 	// pkg is `<real package>`
 	if (strncmp(pkg, KSU_MANAGER_PACKAGE, sizeof(KSU_MANAGER_PACKAGE)) ||
 	    strncmp(pkg, "com.twj.wksu", sizeof("com.twj.wksu")) ||
-	    strncmp(pkg, "com.rifsxd.ksunext", sizeof("com.rifsxd.ksunext"))) {
+	    strncmp(pkg, "com.rifsxd.ksunext", sizeof("com.rifsxd.ksunext")) ||
+	    strncmp(pkg, "me.weishu.kernelsu", sizeof("me.weishu.kernelsu")) ||
+	    strncmp(pkg, "com.kowx712.supermanager", sizeof("com.kowx712.supermanager"))) {
 		return false;
 	}
 #endif
@@ -375,5 +377,13 @@ bool is_manager_apk(char *path)
 	       ||
 	       check_v2_signature(
 		       path, 0x3e6,
-		       "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7"); //Wild KSU
+		       "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7") //KernelSU-Next
+	       ||
+	       check_v2_signature(
+		       path, 0x033b,
+		       "7c371061b19d8c7d7d6133c6a9bafe198fa944e50c1b31c9d8daa8d7f1fc2d2d6") //KernelSU
+		   ||
+	       check_v2_signature(
+		       path, 0x375,
+		       "484fcba6e6c43b1fb09700633bf2fb4758f13cb0b2f4457b80d075084b26c588"); //KowSU
 }
