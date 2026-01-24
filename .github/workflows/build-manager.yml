@@ -255,6 +255,12 @@ jobs:
             "<pre><code>${COMMIT_MESSAGE_ESCAPED}</code></pre>"
           )
 
+          {
+            echo "TELEGRAM_MSG_CONTEXT<<EOF"
+            echo "$MESSAGE"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
           FILES=()
           shopt -s nullglob
           for apk in ./manager/*.apk ./manager-spoofed/*.apk; do
@@ -379,6 +385,12 @@ jobs:
             "<pre><code>${COMMIT_MESSAGE_ESCAPED}</code></pre>"
           )
 
+          {
+            echo "TELEGRAM_MSG_CONTEXT<<EOF"
+            echo "$MESSAGE"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
           FILES=()
           shopt -s nullglob
           for apk in ./manager/*.apk ./manager-spoofed/*.apk; do
@@ -420,6 +432,16 @@ jobs:
               --form-string "caption=${CAPTION}" \
               --form-string "parse_mode=HTML"
           done
+
+      - name: Post APKs to DM (Action)
+        uses: xireiki/channel-post@v1
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_USER_ID }}
+          context: ${{ env.TELEGRAM_MSG_CONTEXT }}
+          parse_mode: HTML
+          path: "**/*.apk"
+          method: sendFile
 
       - name: DM Failure Notification
         if: always() && needs.build-manager.result == 'failure'
