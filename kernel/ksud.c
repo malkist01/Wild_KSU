@@ -36,7 +36,8 @@ static const char KERNEL_SU_RC[] =
 	"on post-fs-data\n"
 	"    start logd\n"
 	// We should wait for the post-fs-data finish
-	"    exec u:r:" KERNEL_SU_DOMAIN ":s0 root -- " KSUD_PATH " post-fs-data\n"
+	"    exec u:r:" KERNEL_SU_DOMAIN ":s0 root -- " KSUD_PATH
+	" post-fs-data\n"
 	"\n"
 
 	"on nonencrypted\n"
@@ -47,10 +48,10 @@ static const char KERNEL_SU_RC[] =
 	"    exec u:r:" KERNEL_SU_DOMAIN ":s0 root -- " KSUD_PATH " services\n"
 	"\n"
 
-    "on property:sys.boot_completed=1\n"
-    "    exec u:r:" KERNEL_SU_DOMAIN ":s0 root -- " KSUD_PATH
-    " boot-completed\n"
-    "\n"
+	"on property:sys.boot_completed=1\n"
+	"    exec u:r:" KERNEL_SU_DOMAIN ":s0 root -- " KSUD_PATH
+	" boot-completed\n"
+	"\n"
 
 	"\n";
 
@@ -116,11 +117,11 @@ void on_module_mounted(void)
 extern void ksu_avc_spoof_late_init();
 void on_boot_completed(void)
 {
-    ksu_boot_completed = true;
-    pr_info("on_boot_completed!\n");
-    track_throne(true);
+	ksu_boot_completed = true;
+	pr_info("on_boot_completed!\n");
+	track_throne(true);
 #ifndef CONFIG_KSU_SUSFS
-    ksu_avc_spoof_late_init();
+	ksu_avc_spoof_late_init();
 #endif // CONFIG_KSU_SUSFS
 }
 
@@ -199,11 +200,12 @@ static void on_post_fs_data_cbfun(struct callback_head *cb)
 	on_post_fs_data();
 }
 
-static struct callback_head on_post_fs_data_cb = { .func =
-							on_post_fs_data_cbfun };
+static struct callback_head on_post_fs_data_cb = {
+	.func = on_post_fs_data_cbfun
+};
 
 static bool check_argv(struct user_arg_ptr argv, int index,
-			const char *expected, char *buf, size_t buf_len)
+		       const char *expected, char *buf, size_t buf_len)
 {
 	const char __user *p;
 	int argc;
@@ -233,8 +235,8 @@ extern int ksu_handle_execveat_init(struct filename *filename);
 
 // IMPORTANT NOTE: the call from execve_handler_pre WON'T provided correct value for envp and flags in GKI version
 int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
-				struct user_arg_ptr *argv,
-				struct user_arg_ptr *envp, int *flags)
+			     struct user_arg_ptr *argv,
+			     struct user_arg_ptr *envp, int *flags)
 {
 	struct filename *filename;
 
@@ -255,11 +257,11 @@ int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
 
 	// https://cs.android.com/android/platform/superproject/+/android-16.0.0_r2:system/core/init/main.cpp;l=77
 	if (unlikely(!memcmp(filename->name, system_bin_init,
-				sizeof(system_bin_init) - 1) &&
-			argv)) {
+			     sizeof(system_bin_init) - 1) &&
+		     argv)) {
 		char buf[16];
 		if (!init_second_stage_executed &&
-			check_argv(*argv, 1, "second_stage", buf, sizeof(buf))) {
+		    check_argv(*argv, 1, "second_stage", buf, sizeof(buf))) {
 			pr_info("/system/bin/init second_stage executed\n");
 			apply_kernelsu_rules();
 			cache_sid();
@@ -268,10 +270,10 @@ int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
 		}
 	}
 
-	if (unlikely(
-			first_zygote &&
-			!memcmp(filename->name, app_process, sizeof(app_process) - 1) &&
-			argv)) {
+	if (unlikely(first_zygote &&
+		     !memcmp(filename->name, app_process,
+			     sizeof(app_process) - 1) &&
+		     argv)) {
 		char buf[16];
 		if (check_argv(*argv, 1, "-Xzygote", buf, sizeof(buf))) {
 			pr_info("exec zygote, /data prepared, second_stage: %d\n",
@@ -280,7 +282,8 @@ int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
 			struct task_struct *init_task =
 				rcu_dereference(current->real_parent);
 			if (init_task)
-				task_work_add(init_task, &on_post_fs_data_cb, TWA_RESUME);
+				task_work_add(init_task, &on_post_fs_data_cb,
+					      TWA_RESUME);
 			rcu_read_unlock();
 			first_zygote = false;
 			stop_execve_hook();
@@ -288,8 +291,8 @@ int ksu_handle_execveat_ksud(int *fd, struct filename **filename_ptr,
 	}
 
 #ifdef CONFIG_KSU_SUSFS
-    // - We need to run ksu_handle_execveat_init() at the very end in case the above checks are skipped
-    (void)ksu_handle_execveat_init(filename);
+	// - We need to run ksu_handle_execveat_init() at the very end in case the above checks are skipped
+	(void)ksu_handle_execveat_init(filename);
 #endif // #ifdef CONFIG_KSU_SUSFS
 
 	return 0;
@@ -307,7 +310,7 @@ const size_t ksu_rc_len = sizeof(KERNEL_SU_RC) - 1;
 // so we begin append ksu rc when we meet EOF.
 
 static ssize_t read_proxy(struct file *file, char __user *buf, size_t count,
-				loff_t *pos)
+			  loff_t *pos)
 {
 	ssize_t ret = 0;
 	size_t append_count;
@@ -326,7 +329,8 @@ append_ksu_rc:
 		append_count = count - ret;
 	// copy_to_user returns the number of not copied
 	if (copy_to_user(buf + ret, KERNEL_SU_RC + ksu_rc_pos, append_count)) {
-		pr_info("read_proxy: append error, totally appended %ld\n", ksu_rc_pos);
+		pr_info("read_proxy: append error, totally appended %ld\n",
+			ksu_rc_pos);
 	} else {
 		pr_info("read_proxy: append %ld\n", append_count);
 
@@ -355,8 +359,8 @@ static ssize_t read_iter_proxy(struct kiocb *iocb, struct iov_iter *to)
 	}
 append_ksu_rc:
 	// copy_to_iter returns the number of copied bytes
-	append_count =
-		copy_to_iter(KERNEL_SU_RC + ksu_rc_pos, ksu_rc_len - ksu_rc_pos, to);
+	append_count = copy_to_iter(KERNEL_SU_RC + ksu_rc_pos,
+				    ksu_rc_len - ksu_rc_pos, to);
 	if (!append_count) {
 		pr_info("read_iter_proxy: append error, totally appended %ld\n",
 			ksu_rc_pos);
@@ -459,12 +463,12 @@ static bool is_volumedown_enough(unsigned int count)
 }
 
 int ksu_handle_input_handle_event(unsigned int *type, unsigned int *code,
-					int *value)
+				  int *value)
 {
 #ifdef CONFIG_KSU_SUSFS
-    if (!ksu_input_hook) {
-        return 0;
-    }
+	if (!ksu_input_hook) {
+		return 0;
+	}
 #endif // #ifdef CONFIG_KSU_SUSFS
 
 	if (*type == EV_KEY && *code == KEY_VOLUMEDOWN) {
@@ -537,7 +541,8 @@ static int sys_execve_handler_pre(struct kprobe *p, struct pt_regs *regs)
 	filename_in.name = path;
 
 	filename_p = &filename_in;
-	return ksu_handle_execveat_ksud(AT_FDCWD, &filename_p, &argv, NULL, NULL);
+	return ksu_handle_execveat_ksud(AT_FDCWD, &filename_p, &argv, NULL,
+					NULL);
 }
 
 static int sys_read_handler_pre(struct kprobe *p, struct pt_regs *regs)
@@ -550,7 +555,7 @@ static int sys_read_handler_pre(struct kprobe *p, struct pt_regs *regs)
 }
 
 static int sys_fstat_handler_pre(struct kretprobe_instance *p,
-					struct pt_regs *regs)
+				 struct pt_regs *regs)
 {
 	struct pt_regs *real_regs = PT_REAL_REGS(regs);
 	unsigned int fd = PT_REGS_PARM1(real_regs);
@@ -571,23 +576,27 @@ static int sys_fstat_handler_pre(struct kretprobe_instance *p,
 }
 
 static int sys_fstat_handler_post(struct kretprobe_instance *p,
-					struct pt_regs *regs)
+				  struct pt_regs *regs)
 {
 	void __user *statbuf = *(void **)&p->data;
 	if (statbuf) {
-		void __user *st_size_ptr = statbuf + offsetof(struct stat, st_size);
+		void __user *st_size_ptr =
+			statbuf + offsetof(struct stat, st_size);
 		long size, new_size;
 		if (!copy_from_user_nofault(&size, st_size_ptr, sizeof(long))) {
 			new_size = size + ksu_rc_len;
-			pr_info("adding ksu_rc_len: %ld -> %ld", size, new_size);
-			if (!copy_to_user_nofault(st_size_ptr, &new_size, sizeof(long))) {
+			pr_info("adding ksu_rc_len: %ld -> %ld", size,
+				new_size);
+			if (!copy_to_user_nofault(st_size_ptr, &new_size,
+						  sizeof(long))) {
 				pr_info("added ksu_rc_len");
 			} else {
 				pr_err("add ksu_rc_len failed: statbuf 0x%lx",
-					(unsigned long)st_size_ptr);
+				       (unsigned long)st_size_ptr);
 			}
 		} else {
-			pr_err("read statbuf 0x%lx failed", (unsigned long)st_size_ptr);
+			pr_err("read statbuf 0x%lx failed",
+			       (unsigned long)st_size_ptr);
 		}
 	}
 
@@ -595,7 +604,7 @@ static int sys_fstat_handler_post(struct kretprobe_instance *p,
 }
 
 static int input_handle_event_handler_pre(struct kprobe *p,
-						struct pt_regs *regs)
+					  struct pt_regs *regs)
 {
 	unsigned int *type = (unsigned int *)&PT_REGS_PARM2(regs);
 	unsigned int *code = (unsigned int *)&PT_REGS_PARM3(regs);
@@ -642,22 +651,23 @@ static void do_stop_input_hook(struct work_struct *work)
 #endif // #ifndef CONFIG_KSU_SUSFS
 
 #ifdef CONFIG_KSU_SUSFS
-void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr) {
-    loff_t new_size = *kstat_size_ptr + ksu_rc_len;
-    struct file *file = fget(fd);
+void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr)
+{
+	loff_t new_size = *kstat_size_ptr + ksu_rc_len;
+	struct file *file = fget(fd);
 
-    if (!file)
-        return;
+	if (!file)
+		return;
 
-    if (is_init_rc(file)) {
-        pr_info("stat init.rc");
-        pr_info("adding ksu_rc_len: %lld -> %lld", *kstat_size_ptr, new_size);
-        *kstat_size_ptr = new_size;
-    }
-    fput(file);
+	if (is_init_rc(file)) {
+		pr_info("stat init.rc");
+		pr_info("adding ksu_rc_len: %lld -> %lld", *kstat_size_ptr,
+			new_size);
+		*kstat_size_ptr = new_size;
+	}
+	fput(file);
 }
 #endif // #ifdef CONFIG_KSU_SUSFS
-
 
 static void stop_init_rc_hook()
 {
@@ -665,10 +675,9 @@ static void stop_init_rc_hook()
 	bool ret = schedule_work(&stop_init_rc_hook_work);
 	pr_info("unregister init_rc_hook kprobe: %d!\n", ret);
 #else
-    ksu_init_rc_hook = false;
-    pr_info("stop init_rc_hook\n");
+	ksu_init_rc_hook = false;
+	pr_info("stop init_rc_hook\n");
 #endif // #ifndef CONFIG_KSU_SUSFS
-
 }
 
 static void stop_execve_hook()
@@ -677,8 +686,8 @@ static void stop_execve_hook()
 	bool ret = schedule_work(&stop_execve_hook_work);
 	pr_info("unregister execve kprobe: %d!\n", ret);
 #else
-    ksu_execveat_hook = false;
-    pr_info("stop execve_hook\n");
+	ksu_execveat_hook = false;
+	pr_info("stop execve_hook\n");
 #endif // #ifndef CONFIG_KSU_SUSFS
 }
 
@@ -693,8 +702,8 @@ static void stop_input_hook()
 	bool ret = schedule_work(&stop_input_hook_work);
 	pr_info("unregister input kprobe: %d!\n", ret);
 #else
-    ksu_input_hook = false;
-    pr_info("stop input_hook\n");
+	ksu_input_hook = false;
+	pr_info("stop input_hook\n");
 #endif // #ifndef CONFIG_KSU_SUSFS
 }
 

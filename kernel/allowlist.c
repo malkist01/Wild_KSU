@@ -69,14 +69,14 @@ static void init_default_profiles()
 {
 	kernel_cap_t full_cap = CAP_FULL_SET;
 
-    default_root_profile.uid = 0;
-    default_root_profile.gid = 0;
-    default_root_profile.groups_count = 1;
-    default_root_profile.groups[0] = 0;
-    memcpy(&default_root_profile.capabilities.effective, &full_cap,
-           sizeof(default_root_profile.capabilities.effective));
-    default_root_profile.namespaces = KSU_NS_INHERITED;
-    strcpy(default_root_profile.selinux_domain, KSU_DEFAULT_SELINUX_DOMAIN);
+	default_root_profile.uid = 0;
+	default_root_profile.gid = 0;
+	default_root_profile.groups_count = 1;
+	default_root_profile.groups[0] = 0;
+	memcpy(&default_root_profile.capabilities.effective, &full_cap,
+	       sizeof(default_root_profile.capabilities.effective));
+	default_root_profile.namespaces = KSU_NS_INHERITED;
+	strcpy(default_root_profile.selinux_domain, KSU_DEFAULT_SELINUX_DOMAIN);
 
 	// This means that we will umount modules by default!
 	default_non_root_profile.umount_modules = true;
@@ -118,7 +118,7 @@ static void ksu_grant_root_to_shell()
 	};
 	strcpy(profile.key, "com.android.shell");
 	strcpy(profile.rp_config.profile.selinux_domain,
-		KSU_DEFAULT_SELINUX_DOMAIN);
+	       KSU_DEFAULT_SELINUX_DOMAIN);
 	ksu_set_app_profile(&profile, false);
 }
 #endif
@@ -237,7 +237,8 @@ out:
 				WARN_ON(1);
 				return false;
 			}
-			allow_list_arr[allow_list_pointer++] = profile->current_uid;
+			allow_list_arr[allow_list_pointer++] =
+				profile->current_uid;
 		} else {
 			remove_uid_from_arr(profile->current_uid);
 		}
@@ -278,14 +279,14 @@ bool __ksu_is_allow_uid(uid_t uid)
 	}
 
 	if (likely(ksu_is_manager_appid_valid()) &&
-		unlikely(ksu_get_manager_appid() == uid % PER_USER_RANGE)) {
+	    unlikely(ksu_get_manager_appid() == uid % PER_USER_RANGE)) {
 		// manager is always allowed!
 		return true;
 	}
 
 	if (likely(uid <= BITMAP_UID_MAX)) {
 		return !!(allow_list_bitmap[uid / BITS_PER_BYTE] &
-				(1 << (uid % BITS_PER_BYTE)));
+			  (1 << (uid % BITS_PER_BYTE)));
 	} else {
 		for (i = 0; i < allow_list_pointer; i++) {
 			if (allow_list_arr[i] == uid)
@@ -309,7 +310,7 @@ bool ksu_uid_should_umount(uid_t uid)
 {
 	struct app_profile profile = { .current_uid = uid };
 	if (likely(ksu_is_manager_appid_valid()) &&
-		unlikely(ksu_get_manager_appid() == uid % PER_USER_RANGE)) {
+	    unlikely(ksu_get_manager_appid() == uid % PER_USER_RANGE)) {
 		// we should not umount on manager!
 		return false;
 	}
@@ -375,10 +376,11 @@ static void do_persistent_allow_list(struct callback_head *_cb)
 	loff_t off = 0;
 
 	mutex_lock(&allowlist_mutex);
-	struct file *fp =
-		filp_open(KERNEL_SU_ALLOWLIST, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	struct file *fp = filp_open(KERNEL_SU_ALLOWLIST,
+				    O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (IS_ERR(fp)) {
-		pr_err("save_allow_list create file failed: %ld\n", PTR_ERR(fp));
+		pr_err("save_allow_list create file failed: %ld\n",
+		       PTR_ERR(fp));
 		goto unlock;
 	}
 
@@ -388,7 +390,8 @@ static void do_persistent_allow_list(struct callback_head *_cb)
 		goto close_file;
 	}
 
-	if (kernel_write(fp, &version, sizeof(version), &off) != sizeof(version)) {
+	if (kernel_write(fp, &version, sizeof(version), &off) !=
+	    sizeof(version)) {
 		pr_err("save_allow_list write version failed.\n");
 		goto close_file;
 	}
@@ -396,7 +399,8 @@ static void do_persistent_allow_list(struct callback_head *_cb)
 	list_for_each (pos, &allow_list) {
 		p = list_entry(pos, struct perm_data, list);
 		pr_info("save allow list, name: %s uid :%d, allow: %d\n",
-			p->profile.key, p->profile.current_uid, p->profile.allow_su);
+			p->profile.key, p->profile.current_uid,
+			p->profile.allow_su);
 
 		kernel_write(fp, &p->profile, sizeof(p->profile), &off);
 	}
@@ -458,7 +462,8 @@ void ksu_load_allow_list()
 		goto exit;
 	}
 
-	if (kernel_read(fp, &version, sizeof(version), &off) != sizeof(version)) {
+	if (kernel_read(fp, &version, sizeof(version), &off) !=
+	    sizeof(version)) {
 		pr_err("allowlist read version: %d failed\n", version);
 		goto exit;
 	}
@@ -475,8 +480,8 @@ void ksu_load_allow_list()
 			break;
 		}
 
-		pr_info("load_allow_uid, name: %s, uid: %d, allow: %d\n", profile.key,
-			profile.current_uid, profile.allow_su);
+		pr_info("load_allow_uid, name: %s, uid: %d, allow: %d\n",
+			profile.key, profile.current_uid, profile.allow_su);
 		ksu_set_app_profile(&profile, false);
 	}
 
@@ -486,15 +491,15 @@ exit:
 }
 
 void ksu_prune_allowlist(bool (*is_uid_valid)(uid_t, char *, void *),
-				void *data)
+			 void *data)
 {
 	struct perm_data *np = NULL;
 	struct perm_data *n = NULL;
 
-    if (!ksu_boot_completed) {
-        pr_info("boot not completed, skip prune\n");
-        return;
-    }
+	if (!ksu_boot_completed) {
+		pr_info("boot not completed, skip prune\n");
+		return;
+	}
 
 	bool modified = false;
 	// TODO: use RCU!

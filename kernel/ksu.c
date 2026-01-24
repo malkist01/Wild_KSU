@@ -27,19 +27,26 @@ struct cred *ksu_cred;
 int __init kernelsu_init(void)
 {
 #ifdef CONFIG_KSU_DEBUG
-	pr_alert("*************************************************************");
-	pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
-	pr_alert("**                                                         **");
-	pr_alert("**         You are running KernelSU in DEBUG mode          **");
-	pr_alert("**                                                         **");
-	pr_alert("**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
-	pr_alert("*************************************************************");
+	pr_alert(
+		"*************************************************************");
+	pr_alert(
+		"**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+	pr_alert(
+		"**                                                         **");
+	pr_alert(
+		"**         You are running KernelSU in DEBUG mode          **");
+	pr_alert(
+		"**                                                         **");
+	pr_alert(
+		"**     NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE NOTICE    **");
+	pr_alert(
+		"*************************************************************");
 #endif
 
-    ksu_cred = prepare_creds();
-    if (!ksu_cred) {
-        pr_err("prepare cred failed!\n");
-    }
+	ksu_cred = prepare_creds();
+	if (!ksu_cred) {
+		pr_err("prepare cred failed!\n");
+	}
 
 	ksu_feature_init();
 
@@ -48,8 +55,8 @@ int __init kernelsu_init(void)
 #ifndef CONFIG_KSU_SUSFS
 	ksu_syscall_hook_manager_init();
 #else
-    ksu_setuid_hook_init();
-    ksu_sucompat_init();
+	ksu_setuid_hook_init();
+	ksu_sucompat_init();
 #endif // #ifndef CONFIG_KSU_SUSFS
 
 	ksu_allowlist_init();
@@ -57,14 +64,14 @@ int __init kernelsu_init(void)
 	ksu_throne_tracker_init();
 
 #ifdef CONFIG_KSU_SUSFS
-    susfs_init();
+	susfs_init();
 #endif // #ifdef CONFIG_KSU_SUSFS
 
 #ifndef CONFIG_KSU_SUSFS
 	ksu_ksud_init();
 #endif // #ifndef CONFIG_KSU_SUSFS
 
-    ksu_file_wrapper_init();
+	ksu_file_wrapper_init();
 
 #ifdef MODULE
 #ifndef CONFIG_KSU_DEBUG

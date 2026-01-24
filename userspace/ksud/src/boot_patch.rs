@@ -706,7 +706,7 @@ pub fn patch(args: BootPatchArgs) -> Result<()> {
                     writeln!(file, "enable_adbd=true")?;
                 }
                 if let Some(prop) = adb_debug_prop {
-                    writeln!(file, "adb_debug_prop={}", prop)?;
+                    writeln!(file, "adb_debug_prop={prop}")?;
                 }
             }
             do_cpio_cmd(
